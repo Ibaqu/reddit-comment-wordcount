@@ -1,21 +1,11 @@
 import praw
 import configparser
+from pyspark import SparkContext, SparkConf
 
+# Create Spark context with necessary configuration
+sc = SparkContext("local","Reddit comment count")
 
-def word_count(stringVal):
-    print("-- Running Word_count function --")
-    counts = dict()
-    words = stringVal.split()
-
-    for word in words:
-        if word in counts:
-            counts[word] += 1
-        else:
-            counts[word] = 1
-
-    return counts
-
-
+# Use config parser to read the auth tokens
 config = configparser.ConfigParser()
 config.read_file(open(r'auth.txt'))
 
@@ -26,13 +16,11 @@ reddit = praw.Reddit(
     user_agent=config.get('auth', 'user_agent'),
 )
 
-
 # Set the subreddit as r/all
 subreddit = reddit.subreddit("all")
 
-# Maintain a list of comments
-commentList = ""
-
+# Create an input file to store the data
+inputFile = open("input.txt", "a")
 
 # Iterate thru the hot posts in the subreddit with the most activity
 for post in subreddit.hot(limit=10):
@@ -47,9 +35,15 @@ for post in subreddit.hot(limit=10):
     # Get a list of comments (only top level not replies)
     top_level_comments = post.comments.list()
 
-    # Concatenate into a single string
+    # Write each comment body to the file
     for comment in top_level_comments:
-        commentList += comment.body
+        inputFile.write(comment.body)
 
-# After concatenation feed to wordcount and print
-print(word_count(commentList))
+# Read data from the input file
+words = sc.textFile("input.txt").flatMap(lambda line: line.split(" "))
+
+# Count the occurrence of each word
+wordCounts = words.map(lambda word: (word, 1)).reduceByKey(lambda a, b: a + b)
+
+# Save the counts to output
+wordCounts.saveAsTextFile("./output")
