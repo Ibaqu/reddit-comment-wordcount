@@ -1,9 +1,11 @@
 import praw
 import configparser
 from pyspark import SparkContext, SparkConf
+from time import time, sleep
+from datetime import datetime
 
 # Create Spark context with necessary configuration
-sc = SparkContext("local","Reddit comment count")
+sc = SparkContext("local", "Reddit comment count")
 
 # Use config parser to read the auth tokens
 config = configparser.ConfigParser()
@@ -19,31 +21,40 @@ reddit = praw.Reddit(
 # Set the subreddit as r/all
 subreddit = reddit.subreddit("all")
 
-# Create an input file to store the data
-inputFile = open("input.txt", "a")
+while True:
 
-# Iterate thru the hot posts in the subreddit with the most activity
-for post in subreddit.hot(limit=10):
-    print("-- Submission title :" + post.title + " --")
+    print("-- Opening Input text file --")
+    # Create an input file to store the data
+    inputFile = open('input.txt', 'a')
 
-    # Sort comments by new to keep it fresh
-    post.comment_sort = "new"
+    # Iterate thru the hot posts in the subreddit with the most activity
+    for post in subreddit.hot(limit=10):
+        print("-- Submission title :" + post.title + " --")
 
-    # Remove all 'More Comments' instances to prevent AttributeError
-    post.comments.replace_more(limit=0)
+        # Sort comments by new to keep it fresh
+        post.comment_sort = "new"
 
-    # Get a list of comments (only top level not replies)
-    top_level_comments = post.comments.list()
+        # Remove all 'More Comments' instances to prevent AttributeError
+        post.comments.replace_more(limit=0)
 
-    # Write each comment body to the file
-    for comment in top_level_comments:
-        inputFile.write(comment.body)
+        # Get a list of comments (only top level not replies)
+        top_level_comments = post.comments.list()
 
-# Read data from the input file
-words = sc.textFile("input.txt").flatMap(lambda line: line.split(" "))
+        # Write each comment body to the file
+        for comment in top_level_comments:
+            inputFile.write(comment.body)
 
-# Count the occurrence of each word
-wordCounts = words.map(lambda word: (word, 1)).reduceByKey(lambda a, b: a + b)
+    # Read data from the input file
+    words = sc.textFile("input.txt").flatMap(lambda line: line.split(" "))
 
-# Save the counts to output
-wordCounts.saveAsTextFile("./output")
+    # Count the occurrence of each word
+    wordCounts = words.map(lambda word: (word, 1)).reduceByKey(lambda a, b: a + b)
+
+    # Save the counts to output
+    wordCounts.saveAsTextFile("./output" + datetime.now().strftime("%H%M%S"))  # pass s3 location
+
+    # Remove contents of input file
+    inputFile.truncate(0)
+
+    print("-- Sleeping for 120 seconds --")
+    sleep(120)
