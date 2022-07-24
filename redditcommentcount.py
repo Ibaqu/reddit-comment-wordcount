@@ -1,5 +1,4 @@
 import praw
-import configparser
 from pyspark import SparkContext, SparkConf
 from time import time, sleep
 from datetime import datetime
@@ -7,15 +6,11 @@ from datetime import datetime
 # Create Spark context with necessary configuration
 sc = SparkContext("local", "Reddit comment count")
 
-# Use config parser to read the auth tokens
-config = configparser.ConfigParser()
-config.read_file(open(r'auth.txt'))
-
 # Initialize the reddit client
 reddit = praw.Reddit(
-    client_id=config.get('auth', 'client_id'),
-    client_secret=config.get('auth', 'client_secret'),
-    user_agent=config.get('auth', 'user_agent'),
+    client_id="client_id",
+    client_secret="client_secret",
+    user_agent="user_agent",
 )
 
 # Set the subreddit as r/all
